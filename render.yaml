@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: student-attendance-performance
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: student-data
+      mountPath: /var/data
+      sizeGB: 1

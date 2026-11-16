@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampusFlow | Student Management</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-icon">C</div><div><b>CampusFlow</b><small>ACADEMIC PORTAL</small></div></div>
+    <div class="nav-label">WORKSPACE</div>
+    <a class="nav active" href="#dashboard">▦ <span>Dashboard</span></a>
+    <a class="nav" href="#students">♙ <span>Students</span></a>
+    <a class="nav" href="#attendance">◷ <span>Attendance</span></a>
+    <a class="nav" href="#marks">▤ <span>Marks & Ranking</span></a>
+    <div class="sidebar-bottom"><div class="avatar">AD</div><div><b>Administrator</b><small>System manager</small></div></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar"><div><span class="eyebrow">OVERVIEW</span><h1>Dashboard</h1><p>Welcome back. Here's what's happening with your students.</p></div><div class="top-right"><span class="status-dot"></span> System online <div class="top-avatar">AD</div></div></header>
+    <section id="dashboard">
+      <div class="stats">
+        <article class="stat-card"><div class="stat-head"><span>Total students</span><span class="stat-icon purple">♙</span></div><strong id="totalStudents">0</strong><small>Registered in the system</small></article>
+        <article class="stat-card"><div class="stat-head"><span>Average attendance</span><span class="stat-icon green">◷</span></div><strong id="avgAttendance">0%</strong><small>Across recorded sessions</small></article>
+        <article class="stat-card"><div class="stat-head"><span>Average marks</span><span class="stat-icon orange">▤</span></div><strong id="avgMarks">0</strong><small>Out of 100</small></article>
+        <article class="stat-card"><div class="stat-head"><span>Top score</span><span class="stat-icon blue">♛</span></div><strong id="topScore">—</strong><small id="topName">No marks recorded</small></article>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <div class="panel wide" id="students">
+        <div class="panel-heading"><div><h2>Student directory</h2><p>Register and manage student records</p></div><button class="primary" onclick="openModal()">＋ Add student</button></div>
+        <div class="toolbar"><input id="search" placeholder="Search by name, ID or department..." oninput="renderStudents()"><span id="studentCount" class="muted">0 students</span></div>
+        <div class="table-wrap"><table><thead><tr><th>STUDENT</th><th>DEPARTMENT</th><th>YEAR</th><th>ATTENDANCE</th><th>MARKS</th><th>ACTION</th></tr></thead><tbody id="studentRows"><tr><td colspan="6" class="empty">No students yet. Add your first student.</td></tr></tbody></table></div>
+      </div>
+      <div class="panel" id="marks">
+        <div class="panel-heading"><div><h2>Top performers</h2><p>Ranked using Max Heap</p></div><span class="pill">TOP 5</span></div>
+        <div id="topList" class="top-list"><div class="empty">No ranking data yet.</div></div>
+      </div>
+    </section>
+
+    <section class="content-grid lower-grid">
+      <div class="panel" id="attendance">
+        <div class="panel-heading"><div><h2>Mark attendance</h2><p>Record today's attendance</p></div><span class="pill green-pill">DAILY</span></div>
+        <form id="attendanceForm" class="form-stack">
+          <label>Student<select id="attendanceStudent" required><option value="">Select student</option></select></label>
+          <label>Attendance status<select id="attendanceStatus"><option>Present</option><option>Absent</option></select></label>
+          <button class="primary full">Save attendance</button>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="panel-heading"><div><h2>Update marks</h2><p>Enter the latest assessment score</p></div><span class="pill">0–100</span></div>
+        <form id="marksForm" class="form-stack">
+          <label>Student<select id="marksStudent" required><option value="">Select student</option></select></label>
+          <label>Marks<input id="marksValue" type="number" min="0" max="100" placeholder="e.g. 85" required></label>
+          <button class="primary full">Update marks</button>
+        </form>
+      </div>
+    </section>
+    <footer>CampusFlow Student Management <span>Built with C data structures · Hash Table · BST · Array · Max Heap</span></footer>
+  </main>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="modal-head"><div><h2>Register student</h2><p>Add a new student to your directory</p></div><button class="close" onclick="closeModal()">×</button></div>
+      <form id="studentForm" class="form-stack">
+        <label>Student ID<input id="studentId" type="number" min="1" placeholder="e.g. 1001" required></label>
+        <label>Full name<input id="studentName" maxlength="79" placeholder="Enter student name" required></label>
+        <label>Department<input id="studentDepartment" maxlength="59" placeholder="e.g. Computer Science" required></label>
+        <label>Year of study<select id="studentYear"><option value="1">First year</option><option value="2">Second year</option><option value="3">Third year</option><option value="4">Fourth year</option><option value="5">Fifth year</option></select></label>
+        <div class="modal-actions"><button type="button" class="secondary" onclick="closeModal()">Cancel</button><button class="primary">Register student</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="/script.js"></script>
+</body>
+</html>
