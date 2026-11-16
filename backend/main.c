@@ -1,8 +1,8 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <curl/curl.h>
 #include <ctype.h>
 #include <errno.h>
 #include <time.h>
