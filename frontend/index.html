@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,72 +9,254 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand"><div class="brand-icon">C</div><div><b>CampusFlow</b><small>ACADEMIC PORTAL</small></div></div>
+    <div class="brand">
+      <div class="brand-icon">C</div>
+      <div><b>CampusFlow</b><small>ACADEMIC PORTAL</small></div>
+    </div>
     <div class="nav-label">WORKSPACE</div>
     <a class="nav active" href="#dashboard">▦ <span>Dashboard</span></a>
     <a class="nav" href="#students">♙ <span>Students</span></a>
     <a class="nav" href="#attendance">◷ <span>Attendance</span></a>
+    <a class="nav" href="#attendanceReports">▥ <span>Attendance Reports</span></a>
     <a class="nav" href="#marks">▤ <span>Marks & Ranking</span></a>
-    <div class="sidebar-bottom"><div class="avatar">AD</div><div><b>Administrator</b><small>System manager</small></div></div>
+    <div class="sidebar-bottom">
+      <div class="avatar">AD</div>
+      <div><b>Administrator</b><small>System manager</small></div>
+    </div>
   </aside>
 
   <main class="main">
-    <header class="topbar"><div><span class="eyebrow">OVERVIEW</span><h1>Dashboard</h1><p>Welcome back. Here's what's happening with your students.</p></div><div class="top-right"><span class="status-dot"></span> System online <div class="top-avatar">AD</div></div></header>
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">OVERVIEW</span>
+        <h1>Dashboard</h1>
+        <p>Welcome back. Here's what's happening with your students.</p>
+      </div>
+      <div class="top-right">
+        <span class="status-dot"></span> System online
+        <div class="top-avatar">AD</div>
+      </div>
+    </header>
+
     <section id="dashboard">
       <div class="stats">
-        <article class="stat-card"><div class="stat-head"><span>Total students</span><span class="stat-icon purple">♙</span></div><strong id="totalStudents">0</strong><small>Registered in the system</small></article>
-        <article class="stat-card"><div class="stat-head"><span>Average attendance</span><span class="stat-icon green">◷</span></div><strong id="avgAttendance">0%</strong><small>Across recorded sessions</small></article>
-        <article class="stat-card"><div class="stat-head"><span>Average marks</span><span class="stat-icon orange">▤</span></div><strong id="avgMarks">0</strong><small>Out of 100</small></article>
-        <article class="stat-card"><div class="stat-head"><span>Top score</span><span class="stat-icon blue">♛</span></div><strong id="topScore">—</strong><small id="topName">No marks recorded</small></article>
+        <article class="stat-card">
+          <div class="stat-head"><span>Total students</span><span class="stat-icon purple">♙</span></div>
+          <strong id="totalStudents">0</strong>
+          <small>Registered in the system</small>
+        </article>
+        <article class="stat-card">
+          <div class="stat-head"><span>Average attendance</span><span class="stat-icon green">◷</span></div>
+          <strong id="avgAttendance">0%</strong>
+          <small>Across recorded sessions</small>
+        </article>
+        <article class="stat-card">
+          <div class="stat-head"><span>Average marks</span><span class="stat-icon orange">▤</span></div>
+          <strong id="avgMarks">0</strong>
+          <small>Out of 100</small>
+        </article>
+        <article class="stat-card">
+          <div class="stat-head"><span>Top score</span><span class="stat-icon blue">♛</span></div>
+          <strong id="topScore">—</strong>
+          <small id="topName">No marks recorded</small>
+        </article>
       </div>
     </section>
 
     <section class="content-grid">
       <div class="panel wide" id="students">
-        <div class="panel-heading"><div><h2>Student directory</h2><p>Register and manage student records</p></div><button class="primary" onclick="openModal()">＋ Add student</button></div>
-        <div class="toolbar"><input id="search" placeholder="Search by name, ID or department..." oninput="renderStudents()"><span id="studentCount" class="muted">0 students</span></div>
-        <div class="table-wrap"><table><thead><tr><th>STUDENT</th><th>DEPARTMENT</th><th>YEAR</th><th>ATTENDANCE</th><th>MARKS</th><th>ACTION</th></tr></thead><tbody id="studentRows"><tr><td colspan="6" class="empty">No students yet. Add your first student.</td></tr></tbody></table></div>
+        <div class="panel-heading">
+          <div><h2>Student directory</h2><p>Register and manage student records</p></div>
+          <button class="primary" onclick="openModal()">＋ Add student</button>
+        </div>
+        <div class="toolbar">
+          <input id="search" placeholder="Search by name, ID or department..." oninput="renderStudents()">
+          <span id="studentCount" class="muted">0 students</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>STUDENT</th><th>DEPARTMENT</th><th>YEAR</th>
+                <th>PRESENT / TOTAL</th><th>ATTENDANCE</th><th>MARKS</th><th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="studentRows">
+              <tr><td colspan="7" class="empty">No students yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
       <div class="panel" id="marks">
-        <div class="panel-heading"><div><h2>Top performers</h2><p>Ranked using Max Heap</p></div><span class="pill">TOP 5</span></div>
-        <div id="topList" class="top-list"><div class="empty">No ranking data yet.</div></div>
+        <div class="panel-heading">
+          <div><h2>Top performers</h2><p>Ranked using Max Heap</p></div>
+          <span class="pill">TOP 5</span>
+        </div>
+        <div id="topList" class="top-list">
+          <div class="empty">No ranking data yet.</div>
+        </div>
       </div>
     </section>
 
     <section class="content-grid lower-grid">
       <div class="panel" id="attendance">
-        <div class="panel-heading"><div><h2>Mark attendance</h2><p>Record today's attendance</p></div><span class="pill green-pill">DAILY</span></div>
+        <div class="panel-heading">
+          <div><h2>Mark attendance</h2><p>Record one attendance status per student per date</p></div>
+          <span class="pill green-pill">DAILY</span>
+        </div>
         <form id="attendanceForm" class="form-stack">
-          <label>Student<select id="attendanceStudent" required><option value="">Select student</option></select></label>
-          <label>Attendance status<select id="attendanceStatus"><option>Present</option><option>Absent</option></select></label>
+          <label>Student
+            <select id="attendanceStudent" required>
+              <option value="">Select student</option>
+            </select>
+          </label>
+          <label>Attendance date
+            <input id="attendanceDate" type="date" required>
+          </label>
+          <label>Attendance status
+            <select id="attendanceStatus">
+              <option>Present</option>
+              <option>Absent</option>
+            </select>
+          </label>
           <button class="primary full">Save attendance</button>
         </form>
+        <p class="hint">One attendance entry per student per calendar date. Duplicate submissions are blocked.</p>
       </div>
+
       <div class="panel">
-        <div class="panel-heading"><div><h2>Update marks</h2><p>Enter the latest assessment score</p></div><span class="pill">0–100</span></div>
+        <div class="panel-heading">
+          <div><h2>Update marks</h2><p>Enter the latest assessment score</p></div>
+          <span class="pill">0–100</span>
+        </div>
         <form id="marksForm" class="form-stack">
-          <label>Student<select id="marksStudent" required><option value="">Select student</option></select></label>
-          <label>Marks<input id="marksValue" type="number" min="0" max="100" placeholder="e.g. 85" required></label>
+          <label>Student
+            <select id="marksStudent" required>
+              <option value="">Select student</option>
+            </select>
+          </label>
+          <label>Marks
+            <input id="marksValue" type="number" min="0" max="100" placeholder="e.g. 85" required>
+          </label>
           <button class="primary full">Update marks</button>
         </form>
       </div>
     </section>
-    <footer>CampusFlow Student Management <span>Built with C data structures · Hash Table · BST · Array · Max Heap</span></footer>
+
+    <section class="panel report-panel" id="attendanceReports">
+      <div class="panel-heading">
+        <div><h2>Overall attendance reports</h2><p>Attendance summary for all students</p></div>
+        <span class="pill green-pill">REPORTS</span>
+      </div>
+      <div class="report-filters">
+        <label>Report month <input id="reportMonth" type="month"></label>
+        <button class="secondary" id="allTimeReport" type="button">All-time report</button>
+        <button class="primary" id="refreshReports" type="button">Apply filter</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>STUDENT</th><th>PRESENT DAYS</th><th>ABSENT DAYS</th>
+              <th>TOTAL SESSIONS</th><th>ATTENDANCE</th><th>UNDATED LEGACY SESSIONS</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceSummaryRows">
+            <tr><td colspan="6" class="empty">Loading attendance report...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">Undated legacy sessions are carried forward from the original student records.</p>
+    </section>
+
+    <section class="panel report-panel">
+      <div class="panel-heading">
+        <div><h2>Individual attendance history</h2><p>View dated Present and Absent entries for one student</p></div>
+        <span class="pill">DATE-WISE</span>
+      </div>
+      <div class="report-filters">
+        <label>Student
+          <select id="historyStudent"><option value="">All students</option></select>
+        </label>
+        <label>Month <input id="historyMonth" type="month"></label>
+        <button class="primary" id="loadHistory" type="button">View history</button>
+      </div>
+      <div class="history-cards" id="historyStats">
+        <div class="mini-stat"><span>Present</span><b id="historyPresent">0</b></div>
+        <div class="mini-stat"><span>Absent</span><b id="historyAbsent">0</b></div>
+        <div class="mini-stat"><span>Dated sessions</span><b id="historyTotal">0</b></div>
+        <div class="mini-stat"><span>Attendance</span><b id="historyPercentage">0%</b></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>DATE</th><th>STUDENT</th><th>STUDENT ID</th><th>STATUS</th></tr>
+          </thead>
+          <tbody id="historyRows">
+            <tr><td colspan="4" class="empty">Select a student or view all records.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel report-panel" id="bstReport">
+      <div class="panel-heading">
+        <div><h2>Marks sorted using BST</h2><p>Descending order from Binary Search Tree traversal</p></div>
+        <span class="pill">BST</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>RANK</th><th>STUDENT</th><th>STUDENT ID</th><th>MARKS</th></tr>
+          </thead>
+          <tbody id="sortedRows">
+            <tr><td colspan="4" class="empty">Loading sorted marks...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      CampusFlow Student Management
+      <span>Built with C data structures · Hash Table · BST · Array · Max Heap</span>
+    </footer>
   </main>
 
   <div class="modal-backdrop" id="modal">
     <div class="modal">
-      <div class="modal-head"><div><h2>Register student</h2><p>Add a new student to your directory</p></div><button class="close" onclick="closeModal()">×</button></div>
+      <div class="modal-head">
+        <div><h2>Register student</h2><p>Add a new student to your directory</p></div>
+        <button class="close" onclick="closeModal()">×</button>
+      </div>
       <form id="studentForm" class="form-stack">
-        <label>Student ID<input id="studentId" type="number" min="1" placeholder="e.g. 1001" required></label>
-        <label>Full name<input id="studentName" maxlength="79" placeholder="Enter student name" required></label>
-        <label>Department<input id="studentDepartment" maxlength="59" placeholder="e.g. Computer Science" required></label>
-        <label>Year of study<select id="studentYear"><option value="1">First year</option><option value="2">Second year</option><option value="3">Third year</option><option value="4">Fourth year</option><option value="5">Fifth year</option></select></label>
-        <div class="modal-actions"><button type="button" class="secondary" onclick="closeModal()">Cancel</button><button class="primary">Register student</button></div>
+        <label>Student ID
+          <input id="studentId" type="number" min="1" placeholder="e.g. 1001" required>
+        </label>
+        <label>Full name
+          <input id="studentName" maxlength="79" placeholder="Enter student name" required>
+        </label>
+        <label>Department
+          <input id="studentDepartment" maxlength="59" placeholder="e.g. Computer Science" required>
+        </label>
+        <label>Year of study
+          <select id="studentYear">
+            <option value="1">First year</option>
+            <option value="2">Second year</option>
+            <option value="3">Third year</option>
+            <option value="4">Fourth year</option>
+            <option value="5">Fifth year</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeModal()">Cancel</button>
+          <button class="primary">Register student</button>
+        </div>
       </form>
     </div>
   </div>
-  <div id="toast" class="toast"></div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/script.js"></script>
 </body>
 </html>
