@@ -1,8 +1,10 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -28,33 +30,55 @@ typedef int socket_t;
 
 #define DEFAULT_PORT 8080
 #define MAX_STUDENTS 1000
+#define MAX_ATTENDANCE 100000
 #define HASH_SIZE 101
 #define BUF_SIZE 65536
-#define DEFAULT_DATA_FILE "data/students.csv"
 
-static char data_file[512] = DEFAULT_DATA_FILE;
+#define DEFAULT_DATA_FILE "data/students.csv"
+#define DEFAULT_ATTENDANCE_FILE "data/attendance.csv"
 
 typedef struct Student {
     int id;
-    char name[80], department[60];
-    int year, marks, present, total;
+    char name[80];
+    char department[60];
+    int year;
+    int marks;
+    int present;
+    int total;
     struct Student *next;
 } Student;
 
 typedef struct BSTNode {
-    int marks, id;
-    struct BSTNode *left, *right;
+    int marks;
+    int id;
+    struct BSTNode *left;
+    struct BSTNode *right;
 } BSTNode;
+
+typedef struct {
+    int id;
+    char date[11];
+    char status[8];
+} AttendanceRecord;
 
 typedef struct {
     Student *buckets[HASH_SIZE];
 } HashTable;
 
 static HashTable table;
+
 static Student students[MAX_STUDENTS];
 static int student_count = 0;
 
-/* HASH TABLE */
+static AttendanceRecord attendance_records[MAX_ATTENDANCE];
+static int attendance_count = 0;
+
+static char data_file[512] = DEFAULT_DATA_FILE;
+static char attendance_file[512] = DEFAULT_ATTENDANCE_FILE;
+
+/* =====================================================
+   HASH TABLE
+===================================================== */
 
 static int hash_id(int id) {
     return (id < 0 ? -id : id) % HASH_SIZE;
@@ -64,7 +88,9 @@ static Student *find_student(int id) {
     Student *p = table.buckets[hash_id(id)];
 
     while (p) {
-        if (p->id == id) return p;
+        if (p->id == id)
+            return p;
+
         p = p->next;
     }
 
@@ -73,6 +99,7 @@ static Student *find_student(int id) {
 
 static void hash_insert(Student *s) {
     int h = hash_id(s->id);
+
     s->next = table.buckets[h];
     table.buckets[h] = s;
 }
@@ -86,6 +113,7 @@ static void hash_remove(int id) {
             *p = (*p)->next;
             return;
         }
+
         p = &(*p)->next;
     }
 }
@@ -97,19 +125,29 @@ static void rebuild_hash(void) {
         hash_insert(&students[i]);
 }
 
-/* FILE STORAGE */
+/* =====================================================
+   FILE STORAGE
+===================================================== */
 
 static void save_data(void) {
     FILE *f = fopen(data_file, "w");
 
-    if (!f) return;
+    if (!f) {
+        printf("Unable to save student data.\n");
+        return;
+    }
 
     for (int i = 0; i < student_count; i++) {
         Student *s = &students[i];
 
         fprintf(f, "%d|%s|%s|%d|%d|%d|%d\n",
-                s->id, s->name, s->department, s->year,
-                s->marks, s->present, s->total);
+                s->id,
+                s->name,
+                s->department,
+                s->year,
+                s->marks,
+                s->present,
+                s->total);
     }
 
     fclose(f);
@@ -118,7 +156,8 @@ static void save_data(void) {
 static void load_data(void) {
     FILE *f = fopen(data_file, "r");
 
-    if (!f) return;
+    if (!f)
+        return;
 
     char line[512];
 
@@ -126,41 +165,165 @@ static void load_data(void) {
            student_count < MAX_STUDENTS) {
 
         Student s = {0};
-        char *parts[7], *p = line;
+
+        char *parts[7];
+        char *p = line;
         int n = 0;
 
         while (n < 7 &&
                (parts[n] = strtok(n == 0 ? p : NULL, "|")) != NULL)
             n++;
 
-        if (n == 7) {
-            s.id = atoi(parts[0]);
+        if (n != 7)
+            continue;
 
-            snprintf(s.name, sizeof(s.name), "%s", parts[1]);
-            snprintf(s.department, sizeof(s.department), "%s", parts[2]);
+        s.id = atoi(parts[0]);
 
-            s.year = atoi(parts[3]);
-            s.marks = atoi(parts[4]);
-            s.present = atoi(parts[5]);
-            s.total = atoi(parts[6]);
+        snprintf(s.name, sizeof(s.name), "%s", parts[1]);
+        snprintf(s.department, sizeof(s.department), "%s", parts[2]);
 
-            s.name[strcspn(s.name, "\r\n")] = 0;
-            s.department[strcspn(s.department, "\r\n")] = 0;
+        s.year = atoi(parts[3]);
+        s.marks = atoi(parts[4]);
+        s.present = atoi(parts[5]);
+        s.total = atoi(parts[6]);
 
-            if (s.id > 0 && !find_student(s.id))
-                students[student_count++] = s;
+        s.name[strcspn(s.name, "\r\n")] = 0;
+        s.department[strcspn(s.department, "\r\n")] = 0;
+
+        if (s.id > 0 &&
+            s.year >= 1 && s.year <= 5 &&
+            s.marks >= 0 && s.marks <= 100 &&
+            s.present >= 0 && s.total >= s.present &&
+            !find_student(s.id)) {
+
+            students[student_count++] = s;
+            hash_insert(&students[student_count - 1]);
         }
     }
 
     fclose(f);
-    rebuild_hash();
 }
 
-/* BINARY SEARCH TREE */
+/* =====================================================
+   ATTENDANCE FILE STORAGE
+===================================================== */
+
+static void save_attendance(void) {
+    FILE *f = fopen(attendance_file, "w");
+
+    if (!f) {
+        printf("Unable to save attendance data.\n");
+        return;
+    }
+
+    for (int i = 0; i < attendance_count; i++) {
+        AttendanceRecord *r = &attendance_records[i];
+
+        fprintf(f, "%d|%s|%s\n",
+                r->id, r->date, r->status);
+    }
+
+    fclose(f);
+}
+
+static int valid_date(const char *date) {
+    if (!date || strlen(date) != 10)
+        return 0;
+
+    if (date[4] != '-' || date[7] != '-')
+        return 0;
+
+    for (int i = 0; i < 10; i++) {
+        if (i != 4 && i != 7 &&
+            !isdigit((unsigned char)date[i]))
+            return 0;
+    }
+
+    int year = atoi(date);
+    int month = (date[5] - '0') * 10 + date[6] - '0';
+    int day = (date[8] - '0') * 10 + date[9] - '0';
+
+    if (year < 2000 || year > 9999 ||
+        month < 1 || month > 12)
+        return 0;
+
+    int days[] = {
+        31,28,31,30,31,30,
+        31,31,30,31,30,31
+    };
+
+    int leap = (year % 400 == 0) ||
+               (year % 4 == 0 && year % 100 != 0);
+
+    if (leap)
+        days[1] = 29;
+
+    return day >= 1 && day <= days[month - 1];
+}
+
+static void load_attendance(void) {
+    FILE *f = fopen(attendance_file, "r");
+
+    if (!f)
+        return;
+
+    char line[128];
+
+    while (fgets(line, sizeof(line), f) &&
+           attendance_count < MAX_ATTENDANCE) {
+
+        AttendanceRecord r = {0};
+
+        if (sscanf(line, "%d|%10[^|]|%7s",
+                   &r.id, r.date, r.status) != 3)
+            continue;
+
+        if (!find_student(r.id) ||
+            !valid_date(r.date))
+            continue;
+
+        if (strcmp(r.status, "Present") != 0 &&
+            strcmp(r.status, "Absent") != 0)
+            continue;
+
+        int duplicate = 0;
+
+        for (int i = 0; i < attendance_count; i++) {
+            if (attendance_records[i].id == r.id &&
+                strcmp(attendance_records[i].date, r.date) == 0) {
+                duplicate = 1;
+                break;
+            }
+        }
+
+        if (!duplicate)
+            attendance_records[attendance_count++] = r;
+    }
+
+    fclose(f);
+}
+
+static int attendance_exists(int id, const char *date) {
+    for (int i = 0; i < attendance_count; i++) {
+        if (attendance_records[i].id == id &&
+            strcmp(attendance_records[i].date, date) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static int month_matches(const char *date, const char *month) {
+    return !month[0] || strncmp(date, month, 7) == 0;
+}
+
+/* =====================================================
+   BINARY SEARCH TREE
+===================================================== */
 
 static BSTNode *bst_insert(BSTNode *root, int marks, int id) {
     if (!root) {
-        BSTNode *n = (BSTNode *)calloc(1, sizeof(BSTNode));
+        BSTNode *n = calloc(1, sizeof(BSTNode));
 
         if (n) {
             n->marks = marks;
@@ -179,29 +342,33 @@ static BSTNode *bst_insert(BSTNode *root, int marks, int id) {
     return root;
 }
 
-static void bst_free(BSTNode *r) {
-    if (!r) return;
+static void bst_free(BSTNode *root) {
+    if (!root)
+        return;
 
-    bst_free(r->left);
-    bst_free(r->right);
-    free(r);
+    bst_free(root->left);
+    bst_free(root->right);
+    free(root);
 }
 
 static void bst_collect_desc(
-    BSTNode *r, int *ids, int *marks, int *count) {
+    BSTNode *root, int *ids, int *marks, int *count) {
 
-    if (!r || *count >= MAX_STUDENTS) return;
+    if (!root || *count >= MAX_STUDENTS)
+        return;
 
-    bst_collect_desc(r->right, ids, marks, count);
+    bst_collect_desc(root->right, ids, marks, count);
 
-    ids[*count] = r->id;
-    marks[*count] = r->marks;
+    ids[*count] = root->id;
+    marks[*count] = root->marks;
     (*count)++;
 
-    bst_collect_desc(r->left, ids, marks, count);
+    bst_collect_desc(root->left, ids, marks, count);
 }
 
-/* MAX HEAP */
+/* =====================================================
+   MAX HEAP
+===================================================== */
 
 static void heap_swap(Student **a, Student **b) {
     Student *t = *a;
@@ -215,18 +382,19 @@ static void heap_push(Student **heap, int *size, Student *s) {
     heap[i] = s;
 
     while (i > 0) {
-        int p = (i - 1) / 2;
+        int parent = (i - 1) / 2;
 
-        if (heap[p]->marks >= heap[i]->marks)
+        if (heap[parent]->marks >= heap[i]->marks)
             break;
 
-        heap_swap(&heap[p], &heap[i]);
-        i = p;
+        heap_swap(&heap[parent], &heap[i]);
+        i = parent;
     }
 }
 
 static Student *heap_pop(Student **heap, int *size) {
-    if (*size <= 0) return NULL;
+    if (*size <= 0)
+        return NULL;
 
     Student *top = heap[0];
 
@@ -235,19 +403,20 @@ static Student *heap_pop(Student **heap, int *size) {
     int i = 0;
 
     for (;;) {
-        int l = 2 * i + 1;
-        int r = 2 * i + 2;
+        int left = 2 * i + 1;
+        int right = 2 * i + 2;
         int largest = i;
 
-        if (l < *size &&
-            heap[l]->marks > heap[largest]->marks)
-            largest = l;
+        if (left < *size &&
+            heap[left]->marks > heap[largest]->marks)
+            largest = left;
 
-        if (r < *size &&
-            heap[r]->marks > heap[largest]->marks)
-            largest = r;
+        if (right < *size &&
+            heap[right]->marks > heap[largest]->marks)
+            largest = right;
 
-        if (largest == i) break;
+        if (largest == i)
+            break;
 
         heap_swap(&heap[i], &heap[largest]);
         i = largest;
@@ -256,7 +425,9 @@ static Student *heap_pop(Student **heap, int *size) {
     return top;
 }
 
-/* JSON HELPERS */
+/* =====================================================
+   JSON HELPERS
+===================================================== */
 
 static void json_escape(
     const char *src, char *dst, size_t cap) {
@@ -273,6 +444,14 @@ static void json_escape(
         else if (c == '\n') {
             dst[j++] = '\\';
             dst[j++] = 'n';
+        }
+        else if (c == '\r') {
+            dst[j++] = '\\';
+            dst[j++] = 'r';
+        }
+        else if (c == '\t') {
+            dst[j++] = '\\';
+            dst[j++] = 't';
         }
         else if (c >= 32) {
             dst[j++] = (char)c;
@@ -299,6 +478,12 @@ static int get_int(
     while (*p && isspace((unsigned char)*p))
         p++;
 
+    if (*p == '-')
+        return atoi(p);
+
+    if (!isdigit((unsigned char)*p))
+        return fallback;
+
     return atoi(p);
 }
 
@@ -322,7 +507,8 @@ static void get_string(
     while (*p && isspace((unsigned char)*p))
         p++;
 
-    if (*p != '"') return;
+    if (*p != '"')
+        return;
 
     p++;
 
@@ -345,13 +531,84 @@ static void get_string(
     }
 }
 
-/* HTTP RESPONSE */
+/* =====================================================
+   URL QUERY HELPERS
+===================================================== */
+
+static int get_query_int(
+    const char *query, const char *key, int fallback) {
+
+    char pattern[80];
+
+    snprintf(pattern, sizeof(pattern), "%s=", key);
+
+    const char *p = strstr(query, pattern);
+
+    if (!p)
+        return fallback;
+
+    if (p != query && p[-1] != '&')
+        return fallback;
+
+    p += strlen(pattern);
+
+    if (!isdigit((unsigned char)*p))
+        return fallback;
+
+    return atoi(p);
+}
+
+static void get_query_month(
+    const char *query, char *month, size_t cap) {
+
+    month[0] = 0;
+
+    const char *p = strstr(query, "month=");
+
+    if (!p)
+        return;
+
+    if (p != query && p[-1] != '&')
+        return;
+
+    p += 6;
+
+    char value[8] = {0};
+
+    if (strlen(p) < 7)
+        return;
+
+    memcpy(value, p, 7);
+
+    if (value[4] != '-')
+        return;
+
+    for (int i = 0; i < 7; i++) {
+        if (i == 4)
+            continue;
+
+        if (!isdigit((unsigned char)value[i]))
+            return;
+    }
+
+    int month_number =
+        (value[5] - '0') * 10 + value[6] - '0';
+
+    if (month_number < 1 || month_number > 12)
+        return;
+
+    snprintf(month, cap, "%s", value);
+}
+
+/* =====================================================
+   HTTP RESPONSE
+===================================================== */
 
 static void send_response(
     socket_t c, int status,
     const char *type, const char *body) {
 
-    char header[512];
+    char header[1024];
 
     const char *reason =
         status == 200 ? "OK" :
@@ -377,7 +634,9 @@ static void send_response(
     send(c, body, len, 0);
 }
 
-/* STUDENT LIST API */
+/* =====================================================
+   STUDENT API
+===================================================== */
 
 static void send_students(socket_t c) {
     char out[BUF_SIZE];
@@ -389,12 +648,13 @@ static void send_students(socket_t c) {
     for (int i = 0; i < student_count; i++) {
         Student *s = &students[i];
 
-        char name[180], dept[140];
+        char name[180];
+        char dept[140];
 
         json_escape(s->name, name, sizeof(name));
         json_escape(s->department, dept, sizeof(dept));
 
-        used += (size_t)snprintf(
+        int n = snprintf(
             out + used, sizeof(out) - used,
             "%s{\"id\":%d,\"name\":\"%s\","
             "\"department\":\"%s\",\"year\":%d,"
@@ -405,7 +665,10 @@ static void send_students(socket_t c) {
             s->marks, s->present, s->total,
             s->total ? 100.0 * s->present / s->total : 0.0);
 
-        if (used >= sizeof(out) - 300) break;
+        if (n < 0 || (size_t)n >= sizeof(out) - used)
+            break;
+
+        used += (size_t)n;
     }
 
     snprintf(out + used, sizeof(out) - used, "]");
@@ -413,7 +676,9 @@ static void send_students(socket_t c) {
     send_response(c, 200, "application/json", out);
 }
 
-/* BST SORTED API */
+/* =====================================================
+   BST SORTED STUDENTS API
+===================================================== */
 
 static void send_sorted(socket_t c) {
     BSTNode *root = NULL;
@@ -436,18 +701,23 @@ static void send_sorted(socket_t c) {
     for (int i = 0; i < count; i++) {
         Student *s = find_student(ids[i]);
 
-        if (!s) continue;
+        if (!s)
+            continue;
 
         char name[180];
 
         json_escape(s->name, name, sizeof(name));
 
-        used += (size_t)snprintf(
+        int n = snprintf(
             out + used, sizeof(out) - used,
             "%s{\"id\":%d,\"name\":\"%s\",\"marks\":%d}",
-            i ? "," : "", s->id, name, marks[i]);
+            i ? "," : "",
+            s->id, name, marks[i]);
 
-        if (used >= sizeof(out) - 250) break;
+        if (n < 0 || (size_t)n >= sizeof(out) - used)
+            break;
+
+        used += (size_t)n;
     }
 
     snprintf(out + used, sizeof(out) - used, "]");
@@ -457,7 +727,9 @@ static void send_sorted(socket_t c) {
     send_response(c, 200, "application/json", out);
 }
 
-/* TOP FIVE STUDENTS USING MAX HEAP */
+/* =====================================================
+   MAX HEAP TOP FIVE API
+===================================================== */
 
 static void send_top(socket_t c) {
     Student *heap[MAX_STUDENTS];
@@ -481,10 +753,16 @@ static void send_top(socket_t c) {
 
         json_escape(s->name, name, sizeof(name));
 
-        used += (size_t)snprintf(
+        int n = snprintf(
             out + used, sizeof(out) - used,
             "%s{\"id\":%d,\"name\":\"%s\",\"marks\":%d}",
-            i ? "," : "", s->id, name, s->marks);
+            i ? "," : "",
+            s->id, name, s->marks);
+
+        if (n < 0 || (size_t)n >= sizeof(out) - used)
+            break;
+
+        used += (size_t)n;
     }
 
     snprintf(out + used, sizeof(out) - used, "]");
@@ -492,14 +770,160 @@ static void send_top(socket_t c) {
     send_response(c, 200, "application/json", out);
 }
 
-/* HTTP CONTENT LENGTH PARSER */
+/* =====================================================
+   DATE-WISE ATTENDANCE HISTORY
+===================================================== */
+
+static void send_attendance_history(
+    socket_t c, int student_id, const char *month) {
+
+    char out[BUF_SIZE];
+    size_t used = 0;
+
+    used += (size_t)snprintf(
+        out + used, sizeof(out) - used, "[");
+
+    int first = 1;
+
+    for (int i = 0; i < attendance_count; i++) {
+        AttendanceRecord *r = &attendance_records[i];
+
+        if (student_id > 0 && r->id != student_id)
+            continue;
+
+        if (!month_matches(r->date, month))
+            continue;
+
+        Student *s = find_student(r->id);
+
+        if (!s)
+            continue;
+
+        char name[180];
+
+        json_escape(s->name, name, sizeof(name));
+
+        int n = snprintf(
+            out + used, sizeof(out) - used,
+            "%s{\"id\":%d,\"name\":\"%s\","
+            "\"date\":\"%s\",\"status\":\"%s\"}",
+            first ? "" : ",",
+            r->id, name, r->date, r->status);
+
+        if (n < 0 || (size_t)n >= sizeof(out) - used)
+            break;
+
+        used += (size_t)n;
+        first = 0;
+    }
+
+    snprintf(out + used, sizeof(out) - used, "]");
+
+    send_response(c, 200, "application/json", out);
+}
+
+/* =====================================================
+   OVERALL AND MONTHLY ATTENDANCE SUMMARY
+===================================================== */
+
+static void send_attendance_summary(
+    socket_t c, const char *month) {
+
+    char out[BUF_SIZE];
+    size_t used = 0;
+
+    used += (size_t)snprintf(
+        out + used, sizeof(out) - used, "[");
+
+    int first = 1;
+
+    for (int i = 0; i < student_count; i++) {
+        Student *s = &students[i];
+
+        int dated_present = 0;
+        int dated_absent = 0;
+
+        for (int j = 0; j < attendance_count; j++) {
+            AttendanceRecord *r = &attendance_records[j];
+
+            if (r->id != s->id ||
+                !month_matches(r->date, month))
+                continue;
+
+            if (strcmp(r->status, "Present") == 0)
+                dated_present++;
+            else
+                dated_absent++;
+        }
+
+        int present = dated_present;
+        int absent = dated_absent;
+        int legacy = 0;
+
+        if (!month[0]) {
+            legacy = s->total - dated_present - dated_absent;
+
+            if (legacy < 0)
+                legacy = 0;
+
+            int legacy_present = s->present - dated_present;
+
+            if (legacy_present < 0)
+                legacy_present = 0;
+
+            if (legacy_present > legacy)
+                legacy_present = legacy;
+
+            present += legacy_present;
+            absent += legacy - legacy_present;
+        }
+
+        int total = present + absent;
+
+        double percentage = total
+            ? 100.0 * present / total
+            : 0.0;
+
+        char name[180];
+
+        json_escape(s->name, name, sizeof(name));
+
+        int n = snprintf(
+            out + used, sizeof(out) - used,
+            "%s{\"id\":%d,\"name\":\"%s\","
+            "\"present_days\":%d,"
+            "\"absent_days\":%d,"
+            "\"total_sessions\":%d,"
+            "\"attendance\":%.1f,"
+            "\"legacy_sessions\":%d}",
+            first ? "" : ",",
+            s->id, name,
+            present, absent, total,
+            percentage, legacy);
+
+        if (n < 0 || (size_t)n >= sizeof(out) - used)
+            break;
+
+        used += (size_t)n;
+        first = 0;
+    }
+
+    snprintf(out + used, sizeof(out) - used, "]");
+
+    send_response(c, 200, "application/json", out);
+}
+
+/* =====================================================
+   HTTP CONTENT LENGTH
+===================================================== */
 
 static int get_content_length(
     const char *request, int *content_length) {
 
     const char *headers_end = strstr(request, "\r\n\r\n");
 
-    if (!headers_end) return 0;
+    if (!headers_end)
+        return 0;
 
     const char *line = request;
 
@@ -515,56 +939,34 @@ static int get_content_length(
         if (colon) {
             size_t name_len = (size_t)(colon - line);
 
-            if (name_len == 14) {
-                const char expected[] = "content-length";
-                int matches = 1;
+            if (name_len == 14 &&
+                strncasecmp(line, "Content-Length", 14) == 0) {
 
-                for (size_t i = 0; i < name_len; i++) {
-                    if ((char)tolower((unsigned char)line[i])
-                        != expected[i]) {
-                        matches = 0;
-                        break;
-                    }
-                }
+                const char *value = colon + 1;
 
-                if (matches) {
-                    const char *value = colon + 1;
+                while (value < line_end &&
+                       isspace((unsigned char)*value))
+                    value++;
 
-                    while (value < line_end &&
-                           isspace((unsigned char)*value))
-                        value++;
+                char number[32];
 
-                    char number[32];
+                size_t len = (size_t)(line_end - value);
 
-                    size_t value_len =
-                        (size_t)(line_end - value);
+                if (!len || len >= sizeof(number))
+                    return 0;
 
-                    if (value_len == 0 ||
-                        value_len >= sizeof(number))
-                        return 0;
+                memcpy(number, value, len);
+                number[len] = '\0';
 
-                    memcpy(number, value, value_len);
-                    number[value_len] = '\0';
+                char *endptr = NULL;
+                long parsed = strtol(number, &endptr, 10);
 
-                    char *endptr = NULL;
+                if (endptr == number || *endptr ||
+                    parsed < 0 || parsed > BUF_SIZE)
+                    return 0;
 
-                    long parsed = strtol(number, &endptr, 10);
-
-                    while (endptr && *endptr &&
-                           isspace((unsigned char)*endptr))
-                        endptr++;
-
-                    if (!endptr ||
-                        endptr == number ||
-                        *endptr != '\0' ||
-                        parsed < 0 ||
-                        parsed > BUF_SIZE)
-                        return 0;
-
-                    *content_length = (int)parsed;
-
-                    return 1;
-                }
+                *content_length = (int)parsed;
+                return 1;
             }
         }
 
@@ -572,11 +974,37 @@ static int get_content_length(
     }
 
     *content_length = 0;
-
     return 1;
 }
 
-/* HTTP CLIENT HANDLER */
+/* =====================================================
+   FRONTEND FILE SERVING
+===================================================== */
+
+static void send_file(
+    socket_t c, const char *filename, const char *type) {
+
+    FILE *f = fopen(filename, "rb");
+
+    if (!f) {
+        send_response(c, 404, "text/plain",
+                      "Frontend file not found.");
+        return;
+    }
+
+    char buffer[BUF_SIZE];
+
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, f);
+    fclose(f);
+
+    buffer[n] = '\0';
+
+    send_response(c, 200, type, buffer);
+}
+
+/* =====================================================
+   HTTP CLIENT HANDLER
+===================================================== */
 
 static void handle_client(socket_t c) {
     char req[BUF_SIZE] = {0};
@@ -585,8 +1013,6 @@ static void handle_client(socket_t c) {
     int header_bytes = 0;
     int content_length = 0;
     int expected_bytes = 0;
-
-    /* Receive complete HTTP request */
 
     while (total < BUF_SIZE - 1) {
         int got = recv(
@@ -603,19 +1029,18 @@ static void handle_client(socket_t c) {
         total += got;
         req[total] = '\0';
 
-        if (header_bytes == 0) {
+        if (!header_bytes) {
             char *separator = strstr(req, "\r\n\r\n");
 
             if (separator) {
                 header_bytes = (int)(separator - req) + 4;
 
                 if (!get_content_length(req, &content_length) ||
-                    content_length >
-                    BUF_SIZE - header_bytes - 1) {
+                    content_length > BUF_SIZE - header_bytes - 1) {
 
                     send_response(
                         c, 400, "application/json",
-                        "{\"error\":\"Invalid or oversized Content-Length.\"}");
+                        "{\"error\":\"Invalid or oversized request.\"}");
 
                     CLOSE_SOCKET(c);
                     return;
@@ -629,7 +1054,7 @@ static void handle_client(socket_t c) {
             break;
     }
 
-    if (header_bytes == 0 || total < expected_bytes) {
+    if (!header_bytes || total < expected_bytes) {
         send_response(
             c, 400, "application/json",
             "{\"error\":\"Incomplete HTTP request.\"}");
@@ -640,8 +1065,16 @@ static void handle_client(socket_t c) {
 
     char method[12] = {0};
     char path[256] = {0};
+    char query[256] = {0};
 
     sscanf(req, "%11s %255s", method, path);
+
+    char *question = strchr(path, '?');
+
+    if (question) {
+        snprintf(query, sizeof(query), "%s", question + 1);
+        *question = '\0';
+    }
 
     if (strcmp(method, "OPTIONS") == 0) {
         send_response(c, 200, "text/plain", "");
@@ -678,6 +1111,31 @@ static void handle_client(socket_t c) {
              strcmp(path, "/api/sorted") == 0) {
 
         send_sorted(c);
+    }
+
+    /* GET ATTENDANCE HISTORY */
+
+    else if (strcmp(method, "GET") == 0 &&
+             strcmp(path, "/api/attendance") == 0) {
+
+        int id = get_query_int(query, "student_id", 0);
+
+        char month[8] = {0};
+        get_query_month(query, month, sizeof(month));
+
+        send_attendance_history(c, id, month);
+    }
+
+    /* GET ATTENDANCE SUMMARY */
+
+    else if (strcmp(method, "GET") == 0 &&
+             strcmp(path, "/api/attendance/summary") == 0) {
+
+        char month[8] = {0};
+
+        get_query_month(query, month, sizeof(month));
+
+        send_attendance_summary(c, month);
     }
 
     /* REGISTER STUDENT */
@@ -733,16 +1191,18 @@ static void handle_client(socket_t c) {
         }
     }
 
-    /* ATTENDANCE */
+    /* DATE-WISE ATTENDANCE */
 
     else if (strcmp(method, "POST") == 0 &&
              strcmp(path, "/api/attendance") == 0) {
 
         int id = get_int(body, "id", 0);
 
-        char status[20];
+        char status[20] = {0};
+        char date[16] = {0};
 
         get_string(body, "status", status, sizeof(status));
+        get_string(body, "date", date, sizeof(date));
 
         Student *s = find_student(id);
 
@@ -750,6 +1210,12 @@ static void handle_client(socket_t c) {
             send_response(
                 c, 404, "application/json",
                 "{\"error\":\"Student not found.\"}");
+        }
+
+        else if (!valid_date(date)) {
+            send_response(
+                c, 400, "application/json",
+                "{\"error\":\"Enter a valid date in YYYY-MM-DD format.\"}");
         }
 
         else if (strcmp(status, "Present") &&
@@ -760,17 +1226,40 @@ static void handle_client(socket_t c) {
                 "{\"error\":\"Status must be Present or Absent.\"}");
         }
 
+        else if (attendance_exists(id, date)) {
+
+            send_response(
+                c, 409, "application/json",
+                "{\"error\":\"Attendance already recorded for this student on this date.\"}");
+        }
+
+        else if (attendance_count >= MAX_ATTENDANCE) {
+
+            send_response(
+                c, 400, "application/json",
+                "{\"error\":\"Attendance record limit reached.\"}");
+        }
+
         else {
+            AttendanceRecord *r =
+                &attendance_records[attendance_count++];
+
+            r->id = id;
+
+            snprintf(r->date, sizeof(r->date), "%s", date);
+            snprintf(r->status, sizeof(r->status), "%s", status);
+
             s->total++;
 
-            if (!strcmp(status, "Present"))
+            if (strcmp(status, "Present") == 0)
                 s->present++;
 
+            save_attendance();
             save_data();
 
             send_response(
-                c, 200, "application/json",
-                "{\"message\":\"Attendance saved.\"}");
+                c, 201, "application/json",
+                "{\"message\":\"Attendance saved successfully.\"}");
         }
     }
 
@@ -802,16 +1291,16 @@ static void handle_client(socket_t c) {
 
             send_response(
                 c, 200, "application/json",
-                "{\"message\":\"Marks updated.\"}");
+                "{\"message\":\"Marks updated successfully.\"}");
         }
     }
 
     /* DELETE STUDENT */
 
     else if (strcmp(method, "DELETE") == 0 &&
-             strncmp(path, "/api/students?id=", 17) == 0) {
+             strcmp(path, "/api/students") == 0) {
 
-        int id = atoi(path + 17);
+        int id = get_query_int(query, "id", 0);
         int idx = -1;
 
         for (int i = 0; i < student_count; i++) {
@@ -835,12 +1324,30 @@ static void handle_client(socket_t c) {
 
             student_count--;
 
+            /* Remove this student's attendance records */
+
+            for (int i = 0; i < attendance_count;) {
+                if (attendance_records[i].id == id) {
+
+                    for (int j = i; j < attendance_count - 1; j++)
+                        attendance_records[j] =
+                            attendance_records[j + 1];
+
+                    attendance_count--;
+                }
+                else {
+                    i++;
+                }
+            }
+
             rebuild_hash();
+
+            save_attendance();
             save_data();
 
             send_response(
                 c, 200, "application/json",
-                "{\"message\":\"Student deleted.\"}");
+                "{\"message\":\"Student deleted successfully.\"}");
         }
     }
 
@@ -850,23 +1357,22 @@ static void handle_client(socket_t c) {
              (strcmp(path, "/") == 0 ||
               strcmp(path, "/index.html") == 0)) {
 
-        FILE *f = fopen("../frontend/index.html", "rb");
+        FILE *f = fopen("frontend/index.html", "rb");
 
         if (!f)
-            f = fopen("frontend/index.html", "rb");
+            f = fopen("../frontend/index.html", "rb");
 
         if (!f) {
             send_response(
                 c, 404, "text/plain",
-                "Frontend file not found. Run from project root.");
+                "Frontend HTML not found.");
         }
-
         else {
-            char page[20000];
+            char page[BUF_SIZE];
 
             size_t n = fread(page, 1, sizeof(page) - 1, f);
 
-            page[n] = 0;
+            page[n] = '\0';
 
             fclose(f);
 
@@ -880,22 +1386,7 @@ static void handle_client(socket_t c) {
     else if (strcmp(method, "GET") == 0 &&
              strcmp(path, "/style.css") == 0) {
 
-        FILE *f = fopen("frontend/style.css", "rb");
-        char page[20000];
-
-        if (!f) {
-            send_response(c, 404, "text/plain", "CSS not found.");
-        }
-
-        else {
-            size_t n = fread(page, 1, sizeof(page) - 1, f);
-
-            page[n] = 0;
-
-            fclose(f);
-
-            send_response(c, 200, "text/css", page);
-        }
+        send_file(c, "frontend/style.css", "text/css");
     }
 
     /* FRONTEND JAVASCRIPT */
@@ -903,25 +1394,9 @@ static void handle_client(socket_t c) {
     else if (strcmp(method, "GET") == 0 &&
              strcmp(path, "/script.js") == 0) {
 
-        FILE *f = fopen("frontend/script.js", "rb");
-        char page[20000];
-
-        if (!f) {
-            send_response(
-                c, 404, "text/plain",
-                "JavaScript not found.");
-        }
-
-        else {
-            size_t n = fread(page, 1, sizeof(page) - 1, f);
-
-            page[n] = 0;
-
-            fclose(f);
-
-            send_response(
-                c, 200, "application/javascript", page);
-        }
+        send_file(
+            c, "frontend/script.js",
+            "application/javascript");
     }
 
     else {
@@ -933,7 +1408,9 @@ static void handle_client(socket_t c) {
     CLOSE_SOCKET(c);
 }
 
-/* MAIN SERVER */
+/* =====================================================
+   MAIN SERVER
+===================================================== */
 
 int main(void) {
     int port = DEFAULT_PORT;
@@ -949,20 +1426,29 @@ int main(void) {
     }
 
     if (data_dir && *data_dir) {
+
 #ifdef _WIN32
         snprintf(data_file, sizeof(data_file),
                  "%s\\students.csv", data_dir);
 
+        snprintf(attendance_file, sizeof(attendance_file),
+                 "%s\\attendance.csv", data_dir);
+
         CreateDirectoryA(data_dir, NULL);
+
 #else
         snprintf(data_file, sizeof(data_file),
                  "%s/students.csv", data_dir);
 
+        snprintf(attendance_file, sizeof(attendance_file),
+                 "%s/attendance.csv", data_dir);
+
         mkdir(data_dir, 0755);
 #endif
-    }
 
+    }
     else {
+
 #ifdef _WIN32
         CreateDirectoryA("data", NULL);
 #else
@@ -980,6 +1466,7 @@ int main(void) {
 #endif
 
     load_data();
+    load_attendance();
 
     socket_t server = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -1022,8 +1509,17 @@ int main(void) {
         return 1;
     }
 
-    printf("\nStudent Attendance & Performance Management System\n");
+    printf("\n");
+    printf("============================================\n");
+    printf(" CAMPUSFLOW STUDENT MANAGEMENT SYSTEM\n");
+    printf("============================================\n");
     printf("Server listening on port %d\n", port);
+    printf("Students loaded: %d\n", student_count);
+    printf("Attendance records loaded: %d\n", attendance_count);
+    printf("Hash Table: Active\n");
+    printf("Binary Search Tree: Active\n");
+    printf("Max Heap: Active\n");
+    printf("Attendance History: Active\n");
     printf("Press Ctrl+C to stop.\n\n");
 
     for (;;) {
